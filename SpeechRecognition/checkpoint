@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/mamounlaptop/Downloads/tensorflow-speech-recognition-master/model"
+all_model_checkpoint_paths: "/Users/mamounlaptop/Downloads/tensorflow-speech-recognition-master/model"
