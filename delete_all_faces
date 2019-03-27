@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+cd ~/Desktop/Code
+
+rm -rf users
+cp -rf users_empty users
+
+rm -rf people.json
+cp -rf empty.json people.json
+
+rm -rf recordings
+mkdir recordings
+
+rm -rf FacesCount.txt
+cp FacesCount1.txt FacesCount.txt

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+
+cd ~/Desktop/Code
+
+python final.py
+
+

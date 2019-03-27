@@ -1,0 +1,12 @@
+#!/bin/bash
+
+
+cd ~/Desktop/Code
+
+rm -rf tags
+mkdir tags
+
+rm -rf configFileName.txt
+echo '' > configFileName.txt
+
+

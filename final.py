@@ -15,11 +15,17 @@ import os
 import gc
 
 
+import threading
+import PyLidar2
+import math    
+import time
+import array
 
-import tflearn
+
+##import tflearn
 import pyaudio
 import wave
-import tflearn as tf
+##import tflearn as tf
 import pyaudio
 import numpy
 
@@ -41,35 +47,49 @@ RATE = 44100
 DEVICE_INDEX = 2
 RECORD_SECONDS = 5
 
-ana_jahez = "/home/pi/Downloads/readytoRec.wav"
-i3lak_jehaaz = "/home/pi/Downloads/Voice-008.m4a"
-bda_tasjeel = "/home/pi/Downloads/Voice-006.mp3"
-intha_tasjeel = "/home/pi/Downloads/endRec.wav"
-idafa_soot = "/home/pi/Downloads/Voice-005.m4a"
-ultra_sound = "/home/pi/Downloads/Voice-010.mp3"
-repeet_recor = "/home/pi/Downloads/Voice-011.m4a"
-rec_new_person = "/home/pi/Downloads/newperson.wav"
-doneTraining = "/home/pi/Downloads/done.wav"
-rec_nobody = "/home/pi/Downloads/nobody.wav"
-rec_ok = "/home/pi/Downloads/ok.wav"
-rec_recording = "/home/pi/Downloads/recording.wav"
-rec_finished = "/home/pi/Downloads/finished.wav"
+ana_jahez = "/home/pi/Desktop/Code/voices/readytoRec.wav"
+i3lak_jehaaz = "/home/pi/Desktop/Code/voices/Voice-008.m4a"
+
+bda_tasjeel = "/home/pi/Desktop/Code/voices/bda_tasjeel.mp3"
+
+intha_tasjeel = "/home/pi/Desktop/Code/voices/endRec.wav"
+idafa_soot = "/home/pi/Desktop/Code/voices/Voice-005.m4a"
+ultra_sound = "/home/pi/Desktop/Code/voices/Voice-010.mp3"
+repeet_recor = "/home/pi/Desktop/Code/voices/Voice-011.m4a"
+rec_new_person = "/home/pi/Desktop/Code/voices/newperson.wav"
+doneTraining = "/home/pi/Desktop/Code/voices/done.wav"
+rec_nobody = "/home/pi/Desktop/Code/voices/nobody.wav"
+rec_ok = "/home/pi/Desktop/Code/voices/ok.wav"
+rec_recording = "/home/pi/Desktop/Code/voices/recording.wav"
+rec_finished = "/home/pi/Desktop/Code/voices/finished.wav"
 
 
-rec_what = "/home/pi/Downloads/what.wav"
-rec_saved = "/home/pi/Downloads/saved.wav"
+rec_what = "/home/pi/Desktop/Code/voices/what.wav"
+rec_saved = "/home/pi/Desktop/Code/voices/saved.wav"
 
-rec_waitingcard = "/home/pi/Downloads/waitingcard.wav"
-rec_tag_not_listed = "/home/pi/Downloads/tagNoListed.wav"
+rec_waitingcard = "/home/pi/Desktop/Code/voices/waitingcard.wav"
+rec_tag_not_listed = "/home/pi/Desktop/Code/voices/tagNoListed.wav"
 
 
-configFileName = '/home/pi/configFileName.txt'
+rec_1step = "/home/pi/Desktop/Code/voices/1step.wav"
+rec_2steps = "/home/pi/Desktop/Code/voices/2steps.wav"
+rec_3steps = "/home/pi/Desktop/Code/voices/3steps.wav"
+
+rec_block_right = "/home/pi/Desktop/Code/voices/blockright.wav"
+rec_block_front = "/home/pi/Desktop/Code/voices/blockfront.wav"
+rec_block_left = "/home/pi/Desktop/Code/voices/blockleft.wav"
+
+
+configFileName = '/home/pi/Desktop/Code/configFileName.txt'
+
+tagsPath = '/home/pi/Desktop/Code/tags/'
+
 
 fileText = ""
 GPIO_TRIGGER = 18
 GPIO_ECHO = 24
 
-Button_1_Pin_5 = 5
+Button_1_Pin_26 = 26
 Button_2_Pin_14 = 14
 
 
@@ -97,12 +117,68 @@ Button_x7_Pin_13_State = False
 
 
 
+def dictAvg40(data, start):
+    Sum = 0.0
+    for i in range(start, start + 40):
+        Sum = Sum + data[i]
+    
+    return Sum / 40.0
 
 
 
 
+port = "/dev/ttyUSB0" #linux
+Obj = PyLidar2.YdLidarX4(port)
+scanning = False
+wasScanning = False
+def scan():
+    global wasScanning
+    global scanning
+    global Obj
+    global gen
 
+    if(not wasScanning and scanning and Obj.Connect()):
+        gen = Obj.StartScanning()
+        
+    if (scanning):
+        data = gen.next()
+        
+        left = dictAvg40(data, 30)
+        front = dictAvg40(data, 70)
+        right = dictAvg40(data, 110)
+        
+        if (left < front and left < right):
+            playSound(rec_block_left)
+            if (left < 2700):
+                playSound(rec_1step)
+            elif (left < 5400):
+                playSound(rec_2steps)
+            else:
+                playSound(rec_3steps)
+        elif (front < left and front < right):
+            playSound(rec_block_front)
+            if (front < 2700):
+                playSound(rec_1step)
+            elif (front < 5400):
+                playSound(rec_2steps)
+            else:
+                playSound(rec_3steps)
+        elif (right < front and right < left):
+            playSound(rec_block_right)
+            if (right < 2700):
+                playSound(rec_1step)
+            elif (right < 5400):
+                playSound(rec_2steps)
+            else:
+                playSound(rec_3steps)        
+        
 
+    
+    if (wasScanning and not scanning):
+        Obj.StopScanning()
+        Obj.Disconnect()
+        
+    wasScanning = scanning
 
 
 
@@ -112,7 +188,7 @@ def initProject():
     GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
     GPIO.setup(GPIO_ECHO, GPIO.IN)
 
-    GPIO.setup(Button_1_Pin_5, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(Button_1_Pin_26, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(Button_2_Pin_14, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     GPIO.setup(Button_x1_Pin_25, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -213,7 +289,7 @@ def record(waveFilePath):
         data = stream.read(CHUNK, exception_on_overflow = False)
         frames.append(data)
         input_1_state =True
-        input_1_state = GPIO.input(Button_1_Pin_5)
+        input_1_state = GPIO.input(Button_1_Pin_26)
         if input_1_state == False:
             input_1_state =True
             break
@@ -389,10 +465,10 @@ def set_tag(tag):
     playSound(rec_recording)
 
     tagee2 = tag.replace(" ", "_")
-    record('/home/pi/Downloads/' + tagee2 + '.wav')
+    record(tagsPath + tagee2 + '.wav')
     playSound(rec_finished)
 
-    playSound('/home/pi/Downloads/' + tagee2 + '.wav')
+    playSound(tagsPath + tagee2 + '.wav')
     
     tags.append(tag)
     writeToFile(configFileName, strToWrite = (tag + "\n"))
@@ -402,7 +478,7 @@ def set_tag(tag):
 
 def read_tag(tag):
     tag2 = tag.replace(" ", "_")
-    playSound("/home/pi/Downloads/" + tag2 + ".wav")
+    playSound(tagsPath + tag2 + ".wav")
     playSound(rec_finished)
 
 for i in range(30):
@@ -412,7 +488,14 @@ while True:
     gc.collect()
 
     input_2_state = GPIO.input(Button_2_Pin_14)
-    input_1_state = GPIO.input(Button_1_Pin_5)
+    input_1_state = GPIO.input(Button_1_Pin_26)
+    if(input_2_state == False):
+        scanning = True
+    else:
+        scanning = False
+        
+    scan()
+        
     if(input_1_state == False):
         print('what do you want?')
         playSound(rec_what)
@@ -423,8 +506,6 @@ while True:
         res = speechRec()
             #ccchash = ['e':0empty, 'x':1read, 'c':2record, 'y':3yes, 'n':4no, 'h':5happy, 's':6sad, 'f':7search face]
         
-        if input_2_state == False:
-            res = 7
         
         if (res == 0 or res == 3 or res == 4):
             print('nothing.. :' + str(res))
@@ -556,7 +637,7 @@ while True:
     #if not outputQueue.empty():
     #    tage = outputQueue.get()
     #    print(tage)
-    input_1_state = GPIO.input(Button_1_Pin_5)
+    input_1_state = GPIO.input(Button_1_Pin_26)
     if(input_1_state == False):
         print('entering face recognitnion mode')
         time.sleep(0.2)
@@ -571,7 +652,7 @@ while True:
             
             """
             while(input_1_state != False):
-                input_1_state = GPIO.input(Button_1_Pin_5)
+                input_1_state = GPIO.input(Button_1_Pin_26)
                 pass
             """
             
@@ -624,7 +705,7 @@ while True:
             print('tag not listed')
             """
             while(input_1_state != False):
-                input_1_state = GPIO.input(Button_1_Pin_5)
+                input_1_state = GPIO.input(Button_1_Pin_26)
                 pass
             """
             
@@ -642,10 +723,10 @@ while True:
                 playSound(ana_jahez)
                 
                 tagee2 = tagee.replace(" ", "_")
-                record("/home/pi/Downloads/" + tagee2 + ".wav")
+                record(tagsPath + tagee2 + ".wav")
                 playSound(intha_tasjeel)
 
-                playSound("/home/pi/Downloads/" + tagee2 + ".wav")
+                playSound(tagsPath + tagee2 + ".wav")
                 
             else:
                 print('no')
@@ -671,19 +752,19 @@ while True:
                 
                 tagee2 = tagee.replace(" ", "_")
                 try:
-                    os.remove("/home/pi/Downloads/" + tagee2 + ".wav")
+                    os.remove(tagsPath + tagee2 + ".wav")
                 except:
                     pass
                 
                 
-                record("/home/pi/Downloads/" + tagee2 + ".wav")
-                playSound("/home/pi/Downloads/" + tagee2 + ".wav")
+                record(tagsPath + tagee2 + ".wav")
+                playSound(tagsPath + tagee2 + ".wav")
 
                 
                 
             else:
                 tagee2 = tagee.replace(" ", "_")
-                name = "/home/pi/Downloads/" + tagee2 + ".wav"
+                name = tagsPath + tagee2 + ".wav"
                 playSound(name)
 
         print(tagee)
@@ -699,19 +780,19 @@ while True:
                     playSound(intha_tasjeel)
                     playSound(bda_tasjeel)
                     tagee2 = tage2.replace(" ", "_")
-                    record("/home/pi/Downloads/" + tagee2 + ".wav")
-                    playSound("/home/pi/Downloads/" + tagee2 + ".wav")
+                    record(tagsPath + tagee2 + ".wav")
+                    playSound(tagsPath + tagee2 + ".wav")
                 else:
                     tags.append(tage2)
                     writeToFile(configFileName, strToWrite = (tage2 + "\n"))
                     playSound(intha_tasjeel)
                     playSound(bda_tasjeel)
                     tagee2 = tage2.replace(" ", "_")
-                    record("/home/pi/Downloads/" + tagee2 + ".wav")
-                    playSound("/home/pi/Downloads/" + tagee2 + ".wav")
+                    record(tagsPath + tagee2 + ".wav")
+                    playSound(tagsPath + tagee2 + ".wav")
                 break  
                 print(tage)
-    input_1_state = GPIO.input(Button_1_Pin_5)
+    input_1_state = GPIO.input(Button_1_Pin_26)
     if(input_1_state == False):
         time.sleep(0.2)
         playSound(ana_jahez)
@@ -721,7 +802,7 @@ while True:
         while True:
             
             #input_1_state = True
-            input_1_state = GPIO.input(Button_1_Pin_5)
+            input_1_state = GPIO.input(Button_1_Pin_26)
             if(input_1_state == False):
                 playSound(i3lak_jehaaz)
                 break
@@ -746,7 +827,7 @@ while True:
                     
                     press = 0
                     while True:
-                        input_1_state = GPIO.input(Button_1_Pin_5)
+                        input_1_state = GPIO.input(Button_1_Pin_26)
                         if(input_1_state == False):
                             press = 1
                             break
@@ -760,13 +841,13 @@ while True:
                         playSound(bda_tasjeel)
                         
                         tagee2 = tagee.replace(" ", "_")
-                        record("/home/pi/Downloads/" + tagee2 + ".wav")
-                        playSound("/home/pi/Downloads/" + tagee2 + ".wav")
+                        record(tagsPath + tagee2 + ".wav")
+                        playSound(tagsPath + tagee2 + ".wav")
                         
 
                 else:
                     tagee2 = tagee.replace(" ", "_")
-                    name = "/home/pi/Downloads/" + tagee2 + ".wav"
+                    name = tagsPath + tagee2 + ".wav"
                     playSound(name)
 
                 print(tagee)
