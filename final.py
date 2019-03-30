@@ -74,15 +74,31 @@ rec_tag_not_listed = "/home/pi/Desktop/Code/voices/tagNoListed.wav"
 rec_1step = "/home/pi/Desktop/Code/voices/1step.wav"
 rec_2steps = "/home/pi/Desktop/Code/voices/2steps.wav"
 rec_3steps = "/home/pi/Desktop/Code/voices/3steps.wav"
+rec_xsteps = "/home/pi/Desktop/Code/voices/steps.wav"
 
 rec_block_right = "/home/pi/Desktop/Code/voices/blockright.wav"
 rec_block_front = "/home/pi/Desktop/Code/voices/blockfront.wav"
 rec_block_left = "/home/pi/Desktop/Code/voices/blockleft.wav"
 
+rec_path_right = "/home/pi/Desktop/Code/voices/passright.mp3"
+rec_path_front = "/home/pi/Desktop/Code/voices/passfront.mp3"
+rec_path_left = "/home/pi/Desktop/Code/voices/passleft.mp3"
+
+rec_incoming_right = "/home/pi/Desktop/Code/voices/incomingright.mp3"
+rec_incoming_front = "/home/pi/Desktop/Code/voices/incomingfront.mp3"
+rec_incoming_left = "/home/pi/Desktop/Code/voices/incomingleft.mp3"
 
 configFileName = '/home/pi/Desktop/Code/configFileName.txt'
 
 tagsPath = '/home/pi/Desktop/Code/tags/'
+
+
+
+
+
+
+speedDif = 1000000
+
 
 
 fileText = ""
@@ -115,63 +131,143 @@ Button_x6_Pin_6_State = False
 Button_x7_Pin_13 = 8
 Button_x7_Pin_13_State = False
 
+class glen(object):
+    def __init__(self, gen, length):
+        self.gen = gen
+        self.length = length
 
+    def __len__(self): 
+        return self.length
 
-def dictAvg40(data, start):
+    def __iter__(self):
+        return self.gen
+
+def dictAvg90(data, start):
     Sum = 0.0
-    for i in range(start, start + 40):
-        Sum = Sum + data[i]
-    
-    return Sum / 40.0
+    counter = 0
+    large = False
+    for i in range(start, start + 90):
+        if data[i] > 10 and data[i] < 9000:
+            Sum = Sum + data[i]
+            counter = counter + 1
+        if data[i] > 9000:
+            large = True
+            
+            
+    if counter == 0:
+        if large == True:
+            return 99999
+        else:
+            return -99999
+            
+    return Sum / counter
 
-
-
-
+pathMode = False
+gen = None
 port = "/dev/ttyUSB0" #linux
 Obj = PyLidar2.YdLidarX4(port)
 scanning = False
 wasScanning = False
+oldLeft = 0
+oldRight = 0
+oldFront = 0
+
 def scan():
+    global oldLeft
+    global oldRight
+    global oldFront
+    global pathMode
     global wasScanning
     global scanning
     global Obj
     global gen
 
-    if(not wasScanning and scanning and Obj.Connect()):
+    if(wasScanning == False and scanning == True and Obj.Connect()):
         gen = Obj.StartScanning()
         
     if (scanning):
-        data = gen.next()
+        try:
+            drop = 30
+            if pathMode == False:
+                drop = 40
+                
+            for i in range(drop):
+                data = gen.next()
+        except:
+            return
+        '''
+        amin = 9999
+        amax = 0
+        for angle in range(0,361):
+            if (data[angle] != 0 and amin > angle):
+                amin = angle
+            if (data[angle] != 0 and amax < angle):
+                amax = angle
+                
+        print("mmminMAAAX" + str(amin) + " " + str(amax))
+        '''
+        print('____________________')
+        ##print('0:' + str(data[0]) + ' \n45:' + str(data[45]) + ' \n90:' + str(data[90]) + ' \n135:' + str(data[135]) + ' \n180:' + str(data[180]) + ' \n225:' + str(data[225]) + ' \n270:' + str(data[270]) + ' \n315:' + str(data[315]))
         
-        left = dictAvg40(data, 30)
-        front = dictAvg40(data, 70)
-        right = dictAvg40(data, 110)
         
-        if (left < front and left < right):
-            playSound(rec_block_left)
-            if (left < 2700):
-                playSound(rec_1step)
-            elif (left < 5400):
-                playSound(rec_2steps)
-            else:
-                playSound(rec_3steps)
-        elif (front < left and front < right):
-            playSound(rec_block_front)
-            if (front < 2700):
-                playSound(rec_1step)
-            elif (front < 5400):
-                playSound(rec_2steps)
-            else:
-                playSound(rec_3steps)
-        elif (right < front and right < left):
-            playSound(rec_block_right)
-            if (right < 2700):
-                playSound(rec_1step)
-            elif (right < 5400):
-                playSound(rec_2steps)
-            else:
-                playSound(rec_3steps)        
+        left = dictAvg90(data, 45)
+        front = dictAvg90(data, 135)
+        right = dictAvg90(data, 225)
+        print(str(left) + '  ' + str(front) + '  ' + str(right))## + ' ' + str(data))
+        factor = 4.5
         
+        if left != -99999 and left != 99999 and right != -99999 and right != 99999 and front != -99999 and front != 99999:
+            if pathMode == False:
+                if (left < front and left < right):
+                    playSound(rec_block_left)
+                    if (left < 2700 / factor):
+                        playSound(rec_1step)
+                    elif (left < 5400 / factor):
+                        playSound(rec_2steps)
+                    elif (left < 8100 / factor):
+                        playSound(rec_3steps)
+                    else:
+                        playSound(rec_xsteps)
+                elif (front < left and front < right):
+                    playSound(rec_block_front)
+                    if (front < 2700 / factor):
+                        playSound(rec_1step)
+                    elif (front < 5400 / factor):
+                        playSound(rec_2steps)
+                    elif (front < 8100 / factor):
+                        playSound(rec_3steps)
+                    else:
+                        playSound(rec_xsteps)
+                elif (right < front and right < left):
+                    playSound(rec_block_right)
+                    if (right < 2700 / factor):
+                        playSound(rec_1step)
+                    elif (right < 5400 / factor):
+                        playSound(rec_2steps)
+                    elif (right < 8100 / factor):
+                        playSound(rec_3steps)
+                    else:
+                        playSound(rec_xsteps)       
+            else:
+                if (left > front and left > right):
+                    playSound(rec_path_left)
+                elif (front > left and front > right):
+                    playSound(rec_path_front)
+                elif (right > front and right > left):
+                    playSound(rec_path_right)
+
+
+            print('difL: ' + str((oldLeft - left)) + 'difF: ' + str((oldFront - front)) + 'difR: ' + str((oldRight - right)))
+            if (oldLeft - left) > speedDif:
+                playSound(rec_incoming_left)
+            if (oldRight - right) > speedDif:
+                playSound(rec_incoming_right)
+            if (oldFront - front) > speedDif:
+                playSound(rec_incoming_front)
+
+            oldLeft = left
+            oldRight = right
+            oldFront = front
 
     
     if (wasScanning and not scanning):
@@ -371,7 +467,8 @@ def methods(cls):
     return [x for x, y in cls.__dict__.items()]
 
 def speechRec():
-
+    global scanning
+    global pathMode
     global Button_x1_Pin_25_State
     global Button_x2_Pin_8_State
     global Button_x3_Pin_7_State
@@ -398,6 +495,19 @@ def speechRec():
         print("Could not understand audio")
 
     result = 0
+    
+    
+    if 'find' in text or 'path' in text:
+        pathMode = True
+        scanning = True
+        
+    if 'obstacle' in text:
+        pathMode = False
+        scanning = True
+        
+    if 'stop' in text:
+        scanning = False
+    
     
     if 'read' in text or Button_x1_Pin_25_State == True:
         result = 1
@@ -489,11 +599,12 @@ while True:
 
     input_2_state = GPIO.input(Button_2_Pin_14)
     input_1_state = GPIO.input(Button_1_Pin_26)
+    """
     if(input_2_state == False):
         scanning = True
     else:
         scanning = False
-        
+    """
     scan()
         
     if(input_1_state == False):
@@ -570,7 +681,7 @@ while True:
         if (res == 7):
             print('recognize face')
             
-            faceid = os.system('python /home/pi/Desktop/Code/find_face.py') / 256
+            faceid = os.system('python3 /home/pi/Desktop/Code/find_face.py') / 256
             print(faceid)
             # unknown face
             if faceid == 255:
